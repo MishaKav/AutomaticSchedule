@@ -15,6 +15,8 @@ namespace AutomaticSchedule
 
         public static void Main(string[] args)
         {
+            var globalWatch = Stopwatch.StartNew();
+
             if (AppSettings.IsLocalWork)
             {
                 //var workSchedule = LoadLastResult();
@@ -22,7 +24,6 @@ namespace AutomaticSchedule
             }
             else
             {
-                Utils.RunProgressBar("Connecting to Gmail", 150);
                 if (SaveExcelFromGmail())
                 {
                     var scheduleFiles = Directory.GetFiles(currentFolder, $"*.{AppSettings.WantedExtention}").Select(s => new FileInfo(s)).ToList();
@@ -45,6 +46,7 @@ namespace AutomaticSchedule
                         {
                             Utils.SendMailNotification("Cann't find worker: " + AppSettings.WantedWorker);
                         }
+                        SendEmailNotification(workSchedule);
                     }
                     else
                     {
@@ -52,6 +54,9 @@ namespace AutomaticSchedule
                     }
                 }
             }
+
+            globalWatch.Stop();
+            Utils.WriteStatus("Work Done | " + globalWatch.ToDefaultFormat());
         }
 
         // return all pair of trainigs
@@ -102,10 +107,6 @@ namespace AutomaticSchedule
 
                 Utils.WriteStatus($"Success add {workSchedule.Reminders.Count} events | {watch.ToDefaultFormat()}");
 
-                workSchedule.Reminders.ForEach(r => Utils.WriteStatus(r.ToDisplayFormat()));
-
-                SendEmailNotification(workSchedule);
-
                 var jsonSchedule = JsonConvert.SerializeObject(workSchedule, Formatting.Indented);
                 File.WriteAllText($"{currentFolder}data.json", jsonSchedule);
             }
@@ -114,23 +115,33 @@ namespace AutomaticSchedule
         // send mail notification about added reminders + suggest days of trainigs
         private static void SendEmailNotification(WorkSchedule workSchedule)
         {
-            if (AppSettings.SendMailNotification)
+            if (workSchedule.IsNotEmptyObject() && workSchedule.Reminders.IsAny())
             {
-                var traningsPairs = GetTraningsPairs(workSchedule);
                 var list = workSchedule.Reminders.Select(r => r.ToDisplayFormat());
                 var mailMessage = string.Join("\n", list) + "\n\n";
-                if (traningsPairs.IsAny())
-                {
-                    mailMessage += "Suggested Trainings:\n";
-                    var listPairs = traningsPairs.Select(t => $"#{traningsPairs.IndexOf(t) + 1} {t.Item1.Start.ToString("dddd")} " +
-                                                              $"({t.Item1.Start.ToDefaultDateFormat()})\n" +
-                                                              $"     {t.Item2.Start.ToString("dddd")} " +
-                                                              $"({t.Item2.Start.ToDefaultDateFormat()})\n").ToList();
-                    mailMessage += string.Join("\n", listPairs) + "\n\n";
-                }
-                mailMessage += "Automatic Schedule by Misha Kav :)";
 
-                Utils.SendMailNotification(mailMessage);
+                if (AppSettings.SuggestTrainigs)
+                {
+                    var traningsPairs = GetTraningsPairs(workSchedule);
+                    
+                    if (traningsPairs.IsAny())
+                    {
+                        mailMessage += "Suggested Trainings:\n";
+                        var listPairs = traningsPairs.Select(t => $"#{traningsPairs.IndexOf(t) + 1} {t.Item1.Start.ToString("dddd")} " +
+                                                                  $"({t.Item1.Start.ToDefaultDateFormat()})\n" +
+                                                                  $"     {t.Item2.Start.ToString("dddd")} " +
+                                                                  $"({t.Item2.Start.ToDefaultDateFormat()})\n").ToList();
+                        mailMessage += string.Join("\n", listPairs) + "\n\n";
+                    }
+                }
+
+                mailMessage += "Automatic Schedule by Misha Kav :)";
+                Utils.WriteStatus(mailMessage);
+
+                if (AppSettings.SendMailNotification)
+                {
+                    Utils.SendMailNotification(mailMessage);
+                }
             }
         }
 
@@ -156,6 +167,7 @@ namespace AutomaticSchedule
         // scan and save Gmail from attachment with wanted format
         private static bool SaveExcelFromGmail()
         {
+            Utils.RunProgressBar("Connecting to Gmail", 150);
             var findAttachment = false;
             var oServer = new MailServer("imap.gmail.com", "developer.newconcept@gmail.com", "robot555", ServerProtocol.Imap4);
             var oClient = new MailClient("TryIt");

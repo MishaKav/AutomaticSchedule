@@ -121,6 +121,7 @@
     <Compile Include="WorkSchedule.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="ScreenShot.PNG" />
     <None Include="App.Settings.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
