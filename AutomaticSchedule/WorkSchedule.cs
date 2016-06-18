@@ -25,7 +25,18 @@ namespace AutomaticSchedule
 
         public override string ToString()
         {
-            return $"{JobName}: {Start.ToString("dd/MM/yy HH:mm")} - {End.ToString("HH:mm")}";
+            return $"{Start.ToString("ddd")} {JobName}: {Start.ToString("dd/MM/yy HH:mm")} - {End.ToString("HH:mm")}";
+        }
+    }
+
+    public static class ExtensionWorkSchedule
+    {
+        public static string ToDisplayFormat(this Reminder source)
+        {
+            if (source == null) return string.Empty;
+
+            var text = $"{source.Start.ToDefaultDateFormat()}  {source.Start.ToString("ddd"),-8}: {source.Start.ToDefaultTimeFormat()} - {source.End.ToDefaultTimeFormat()}    [{(source.End - source.Start).TotalHours,-2} h]";
+            return text;
         }
     }
 }
