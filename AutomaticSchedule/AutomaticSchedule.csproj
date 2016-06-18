@@ -96,6 +96,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -109,6 +110,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AppSettings.cs" />
     <Compile Include="ExcelApi.cs" />
     <Compile Include="ExtensionMethods.cs" />
     <Compile Include="GoogleApi.cs" />
@@ -119,6 +121,9 @@
     <Compile Include="WorkSchedule.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.Settings.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="App.config" />
     <Content Include="NLog.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
