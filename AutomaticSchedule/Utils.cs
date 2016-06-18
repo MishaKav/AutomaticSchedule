@@ -73,6 +73,12 @@ namespace AutomaticSchedule
             LogManager.GetLogger(LoggerList.MyCustomLog.ToString()).Debug(msg);
         }
 
+        public static void WriteStatus(string msg)
+        {
+            Console.WriteLine(msg);
+            LogManager.GetLogger(LoggerList.StatusLog.ToString()).Info(msg);
+        }
+
         /// <summary>
         /// Just send email notification by Gmail account from NLog.config
         /// </summary>
@@ -88,8 +94,7 @@ namespace AutomaticSchedule
         }
         #endregion NLOG
 
-
-        #region Misc
+        #region ProgressBar
 
         public static ProgressBar ProgressBar;
 
@@ -120,7 +125,9 @@ namespace AutomaticSchedule
             });
         }
 
-        #endregion Misc
+        #endregion ProgressBar
+
+        #region Misc
 
         public static string GetWebRequest(string url)
         {
@@ -167,10 +174,6 @@ namespace AutomaticSchedule
             return arr.Contains(Environment.MachineName.ToLower());
         }
 
-        public static void WriteStatus(string msg)
-        {
-            Console.WriteLine(msg);
-            LogManager.GetLogger(LoggerList.StatusLog.ToString()).Info(msg);
-        }
+        #endregion Misc
     }
 }
