@@ -4,91 +4,158 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using EAGetMail;
+using Newtonsoft.Json;
 
 namespace AutomaticSchedule
 {
     public class Program
     {
         private static readonly string dataPath = $@"{Directory.GetCurrentDirectory()}\Data\";
-        private static readonly string currentFolder = $@"{dataPath}{DateTime.Now.ToString("dd-MM-yyyy")}/";
-        private const string wanterExtention = "xlsx";
-        private const string wanterWorker = "קוסטיה";
+        private static readonly string currentFolder = $@"{dataPath}{DateTime.Now.ToString("dd-MM-yyyy")}\";
 
         public static void Main(string[] args)
         {
-
-            Utils.RunProgressBar("Connecting to Gmail", 150);
-            if (SaveExcelFromGmail())
+            if (AppSettings.IsLocalWork)
             {
-                var scheduleFiles = Directory.GetFiles(currentFolder, $"*.{wanterExtention}").Select(s => new FileInfo(s)).ToList();
-                if (scheduleFiles.IsAny())
+                //var workSchedule = LoadLastResult();
+                //AddWorkScheduleToCalendar(workSchedule);
+            }
+            else
+            {
+                Utils.RunProgressBar("Connecting to Gmail", 150);
+                if (SaveExcelFromGmail())
                 {
-                    var file = scheduleFiles.OrderBy(f => f.LastWriteTime).First();
-                    Utils.RunProgressBar("Scaning Excel", 620);
-                    var watch = Stopwatch.StartNew();
-                    var _workSchedule = ExcelApi.GetWorkHours(file.FullName, wanterWorker);
-                    watch.Stop();
-                    Utils.ProgressBar.Finish();
-
-                    if (_workSchedule.IsNotEmptyObject())
+                    var scheduleFiles = Directory.GetFiles(currentFolder, $"*.{AppSettings.WantedExtention}").Select(s => new FileInfo(s)).ToList();
+                    if (scheduleFiles.IsAny())
                     {
-                        Utils.WriteStatus($"Success to analize Work Schedule | {watch.ToDefaultFormat()}");
-
-                        Utils.RunProgressBar("Connect to Google Calendar", 7);
-                        var coonected = GoogleApi.ConnectCalendar();
+                        var file = scheduleFiles.OrderBy(f => f.LastWriteTime).First();
+                        Utils.RunProgressBar("Scaning Excel", 620);
+                        var watch = Stopwatch.StartNew();
+                        var workSchedule = ExcelApi.GetWorkHours(file.FullName, AppSettings.WantedWorker);
+                        watch.Stop();
                         Utils.ProgressBar.Finish();
 
-                        if (coonected)
+                        if (workSchedule.IsNotEmptyObject())
                         {
-                            Utils.RunProgressBar($"Start adding {_workSchedule.Reminders.Count} event to Google Calendar", 10);
-                            var watch1 = Stopwatch.StartNew();
-                            foreach (var reminder in _workSchedule.Reminders)
-                            {
-                                var eventAdded = GoogleApi.AddEvent(reminder);
-                                Utils.WriteStatus($"{reminder} is {(eventAdded ? "added" : "NOT ADDED")}");
-                            }
-                            watch1.Stop();
-                            Utils.ProgressBar.Finish();
+                            Utils.WriteStatus($"Success to analize Work Schedule | {watch.ToDefaultFormat()}");
 
-                            Utils.WriteStatus($"Success add {_workSchedule.Reminders.Count} events | {watch1.ToDefaultFormat()}");
-
-                            var list = GetPrintedSchedule(_workSchedule);
-                            list.ForEach(Utils.WriteStatus);
-                            Utils.SendMailNotification(string.Join("\n", list) + "\n\nAutomatic Schedule by Misha Kav :)");
+                            AddWorkScheduleToCalendar(workSchedule);
+                        }
+                        else
+                        {
+                            Utils.SendMailNotification("Cann't find worker: " + AppSettings.WantedWorker);
                         }
                     }
                     else
                     {
-                        Utils.SendMailNotification("Cann't find worker: " + wanterWorker);
+                        Utils.SendMailNotification("Gmail scan return true, but no file founded");
                     }
                 }
-                else
+            }
+        }
+
+        // return all pair of trainigs
+        private static List<Tuple<Reminder, Reminder>> GetTraningsPairs(WorkSchedule data)
+        {
+            if (data != null && data.Reminders.IsAny())
+            {
+                var relevantTranings = data.Reminders.FindAll(r => r.Start.Hour == 23);
+                if (relevantTranings.IsAny())
                 {
-                    Utils.SendMailNotification("Gmail scan return true, but no file founded");
+                    var actualTranings = new List<Tuple<Reminder, Reminder>>();
+                    foreach (var t1 in relevantTranings)
+                    {
+                        foreach (var t2 in relevantTranings)
+                        {
+                            if ((t2.Start - t1.Start).TotalHours > 24)
+                            {
+                                actualTranings.Add(new Tuple<Reminder, Reminder>(t1, t2));
+                            }
+                        }
+                    }
+
+                    return actualTranings;
                 }
             }
+
+            return null;
         }
 
-        private static List<string> GetPrintedSchedule(WorkSchedule workSchedule)
+        // add all reminders from schedule to calendar
+        private static void AddWorkScheduleToCalendar(WorkSchedule workSchedule)
         {
-            var list = new List<string>();
+            Utils.RunProgressBar("Connect to Google Calendar", 7);
+            var coonected = GoogleApi.ConnectCalendar();
+            Utils.ProgressBar.Finish();
 
-            foreach (var reminder in workSchedule.Reminders)
+            if (coonected)
             {
-                var text = $"{reminder.Start.ToDefaultDateFormat()}  {reminder.Start.ToString("ddd"), -8}: {reminder.Start.ToDefaultTimeFormat()} - {reminder.End.ToDefaultTimeFormat()}    [{(reminder.End - reminder.Start).TotalHours,-2} h]";
-                list.Add(text);
-            }
+                Utils.RunProgressBar($"Start adding {workSchedule.Reminders.Count} event to Google Calendar", 10);
+                var watch = Stopwatch.StartNew();
+                foreach (var reminder in workSchedule.Reminders)
+                {
+                    var eventAdded = GoogleApi.AddEvent(reminder);
+                    Utils.WriteStatus($"{reminder} is {(eventAdded ? "added" : "NOT ADDED")}");
+                }
+                watch.Stop();
+                Utils.ProgressBar.Finish();
 
-            return list;
+                Utils.WriteStatus($"Success add {workSchedule.Reminders.Count} events | {watch.ToDefaultFormat()}");
+
+                workSchedule.Reminders.ForEach(r => Utils.WriteStatus(r.ToDisplayFormat()));
+
+                SendEmailNotification(workSchedule);
+
+                var jsonSchedule = JsonConvert.SerializeObject(workSchedule, Formatting.Indented);
+                File.WriteAllText($"{currentFolder}data.json", jsonSchedule);
+            }
         }
 
+        // send mail notification about added reminders + suggest days of trainigs
+        private static void SendEmailNotification(WorkSchedule workSchedule)
+        {
+            if (AppSettings.SendMailNotification)
+            {
+                var traningsPairs = GetTraningsPairs(workSchedule);
+                var list = workSchedule.Reminders.Select(r => r.ToDisplayFormat());
+                var mailMessage = string.Join("\n", list) + "\n\n";
+                if (traningsPairs.IsAny())
+                {
+                    mailMessage += "Suggested Trainings:\n";
+                    var listPairs = traningsPairs.Select(t => $"#{traningsPairs.IndexOf(t) + 1} {t.Item1.Start.ToString("dddd")} " +
+                                                              $"({t.Item1.Start.ToDefaultDateFormat()})\n" +
+                                                              $"     {t.Item2.Start.ToString("dddd")} " +
+                                                              $"({t.Item2.Start.ToDefaultDateFormat()})\n").ToList();
+                    mailMessage += string.Join("\n", listPairs) + "\n\n";
+                }
+                mailMessage += "Automatic Schedule by Misha Kav :)";
+
+                Utils.SendMailNotification(mailMessage);
+            }
+        }
+
+        // need to work from local. Just load the last result from local json file
+        private static WorkSchedule LoadLastResult()
+        {
+            var jsonFiles = Directory.GetFiles(dataPath, "*.json", SearchOption.AllDirectories).Select(s => new FileInfo(s)).ToList();
+
+            if (jsonFiles.IsAny())
+            {
+                var file = jsonFiles.OrderBy(f => f.LastWriteTime).First();
+                var jsonData = File.ReadAllText(file.FullName);
+                if (jsonData.IsNotNullOrEmpty())
+                {
+                    var workSchedule = JsonConvert.DeserializeObject<WorkSchedule>(jsonData);
+                    return workSchedule;
+                }
+
+            }
+            return null;
+        }
+
+        // scan and save Gmail from attachment with wanted format
         private static bool SaveExcelFromGmail()
         {
-            if (!Directory.Exists(currentFolder))
-            {
-                Directory.CreateDirectory(currentFolder);
-            }
-
             var findAttachment = false;
             var oServer = new MailServer("imap.gmail.com", "developer.newconcept@gmail.com", "robot555", ServerProtocol.Imap4);
             var oClient = new MailClient("TryIt");
@@ -104,15 +171,23 @@ namespace AutomaticSchedule
                 {
                     //Console.WriteLine($"Index: {info.Index}; Size: {info.Size}; UIDL: {info.UIDL}");
                     var oMail = oClient.GetMail(info);
-                    Utils.WriteStatus($"Date: {oMail.ReceivedDate.ToDefaultDateTimeFormat()} | From: {oMail.From} | Subject: {oMail.Subject.Replace("(Trial Version)", string.Empty)}");
-
-                    if (oMail.Attachments.IsAny() && oMail.Attachments.Any(a => a.Name.ContainsIgnoreCase(wanterExtention)))
+                    if (oMail.ReceivedDate > DateTime.Now.AddMonths(-1))
                     {
-                        //var fileName = $@"{currentFolder}/{oMail.From.Address}_{oMail.Subject.Replace(":", string.Empty).Replace("(Trial Version)", string.Empty)}.eml";
-                        oMail.Attachments[0].SaveAs($@"{currentFolder}\{oMail.Attachments[0].Name}", true);
-                        //oMail.SaveAs(fileName, true);
-                        findAttachment = true;
-                        break;
+                        Utils.WriteStatus($"Date: {oMail.ReceivedDate.ToDefaultDateTimeFormat()} | From: {oMail.From} | Subject: {oMail.Subject.Replace("(Trial Version)", string.Empty)}");
+
+                        if (oMail.Attachments.IsAny() && oMail.Attachments.Any(a => a.Name.ContainsIgnoreCase(AppSettings.WantedExtention)))
+                        {
+                            if (!Directory.Exists(currentFolder))
+                            {
+                                Directory.CreateDirectory(currentFolder);
+                            }
+
+                            //var fileName = $@"{currentFolder}/{oMail.From.Address}_{oMail.Subject.Replace(":", string.Empty).Replace("(Trial Version)", string.Empty)}.eml";
+                            oMail.Attachments[0].SaveAs($@"{currentFolder}\{oMail.Attachments[0].Name}", true);
+                            //oMail.SaveAs(fileName, true);
+                            findAttachment = true;
+                            break;
+                        } 
                     }
                 }
 
