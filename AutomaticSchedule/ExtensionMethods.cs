@@ -128,18 +128,20 @@ namespace AutomaticSchedule
                 return string.Empty;
             }
 
-            byte[] bytes = Encoding.Default.GetBytes(source);
+            var bytes = Encoding.Default.GetBytes(source);
             return Encoding.UTF8.GetString(bytes);
         }
 
         public static string ToDefaultFormat(this Stopwatch source)
         {
-            if (source.Elapsed.TotalSeconds > 60)
+            if (source != null)
             {
-                return $"{source.Elapsed.TotalMinutes.ToString("N0")}m {source.Elapsed.Seconds.ToString("N0")}s";
+                return source.Elapsed.TotalSeconds > 60 ? 
+                    $"{source.Elapsed.TotalMinutes.ToString("N0")}m {source.Elapsed.Seconds.ToString("N0")}s" : 
+                    $"{source.Elapsed.TotalSeconds.ToString("N2")}s";
             }
 
-            return $"{source.Elapsed.TotalSeconds.ToString("N2")}s";
+            return string.Empty;
         }
 
 
@@ -194,7 +196,7 @@ namespace AutomaticSchedule
         {
             return Math.Ceiling(source).ToString("#,#");
         }
-        
+
         public static string ToEstimateDuration(this string minutes)
         {
             if (minutes.IsNullOrEmpty()) return "0 Min";
@@ -210,5 +212,21 @@ namespace AutomaticSchedule
         }
 
         #endregion Global Utils
+
+        #region LINQ Extentions
+
+        public static IEnumerable<TSource> DistinctBy<TSource, TKey>(this IEnumerable<TSource> source, Func<TSource, TKey> keySelector)
+        {
+            var seenKeys = new HashSet<TKey>();
+            foreach (var element in source)
+            {
+                if (seenKeys.Add(keySelector(element)))
+                {
+                    yield return element;
+                }
+            }
+        }
+
+        #endregion LINQ Extentions
     }
 }
