@@ -12,8 +12,6 @@ namespace AutomaticSchedule
 {
     public static class GoogleApi
     {
-        private const string API_KEY = "AIzaSyAlifzZigshjH1BMQjQCzJstgIKVcMHHv4"; // Misha Kav
-        public const string GoogleCalendarIdentifyer = "#DiscountWorkSchedule#";
         public static List<CalendarListEntry> CalendarsList;
         public static CalendarListEntry SelectedCalendar;
         public static CalendarService CalendarConnection;
@@ -23,8 +21,8 @@ namespace AutomaticSchedule
         {
             var secrets = new ClientSecrets
             {
-                ClientId = "945058434822-kg3aivhus8fe562j7a1oar208jokclsl.apps.googleusercontent.com",
-                ClientSecret = "i14Tm4YYq2XGXtpyIsk5geAl"
+                ClientId = AppSettings.Google.ClientId,
+                ClientSecret = AppSettings.Google.ClientSecret
             };
 
             try
@@ -64,8 +62,8 @@ namespace AutomaticSchedule
 
                 // select primary calendar
                 //cbCalendars.SelectedIndex = calendars.FindIndex(c => c.Primary.HasValue && c.Primary.Value);
-                SelectedCalendar = CalendarsList.Any(c => c.Summary.ToLower().Contains("работа")) ?
-                    CalendarsList.Find(c => c.Summary.ToLower().Contains("работа")) :
+                SelectedCalendar = CalendarsList.Any(c => c.Summary.ContainsIgnoreCase(AppSettings.Google.DefaultCalendar)) ?
+                    CalendarsList.Find(c => c.Summary.ContainsIgnoreCase(AppSettings.Google.DefaultCalendar)) :
                     CalendarsList.FirstOrDefault();
             }
         }
@@ -86,7 +84,7 @@ namespace AutomaticSchedule
                     {
                         DateTime = reminder.End
                     },
-                    Description = $"{GoogleCalendarIdentifyer}\nJob: {reminder.JobName}\nHours: {(reminder.End - reminder.Start).TotalHours} h",
+                    Description = $"{AppSettings.Google.CalendarIdentifyer}\nJob: {reminder.JobName}\nHours: {(reminder.End - reminder.Start).TotalHours} h",
                     Reminders = new Event.RemindersData { UseDefault = false }
                 };
 
@@ -120,7 +118,7 @@ namespace AutomaticSchedule
                 if (request.IsNotEmptyObject() && request.Items.IsAny())
                 {
                     var events = request.Items.ToList();
-                    return events.FindAll(e => e.Summary == eventName && e.Description.Contains(GoogleCalendarIdentifyer));
+                    return events.FindAll(e => e.Summary == eventName && e.Description.Contains(AppSettings.Google.CalendarIdentifyer));
                 }
             }
 
@@ -144,7 +142,7 @@ namespace AutomaticSchedule
                 if (request.IsNotEmptyObject() && request.Items.IsAny())
                 {
                     var events = request.Items.ToList();
-                    return events.Any(e => e.Summary.ContainsIgnoreCase(eventName) && e.Description.ContainsIgnoreCase(GoogleCalendarIdentifyer));
+                    return events.Any(e => e.Summary.ContainsIgnoreCase(eventName) && e.Description.ContainsIgnoreCase(AppSettings.Google.CalendarIdentifyer));
                 }
             }
 
@@ -165,7 +163,7 @@ namespace AutomaticSchedule
 
         public static DirectionsResponse GetDirections(GoogleLocation a, GoogleLocation b)
         {
-            var url = $"https://maps.googleapis.com/maps/api/directions/json?origin={a.lat},{a.lng}&destination={b.lat},{b.lng}&mode=driving&units=metric&key={API_KEY}";
+            var url = $"https://maps.googleapis.com/maps/api/directions/json?origin={a.lat},{a.lng}&destination={b.lat},{b.lng}&mode=driving&units=metric&key={AppSettings.Google.API_KEY}";
             var response = Utils.GetWebRequest(url);
 
             var res = JsonConvert.DeserializeObject<DirectionsResponse>(response);
