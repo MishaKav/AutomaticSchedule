@@ -10,8 +10,25 @@ namespace AutomaticSchedule
 {
     public class Program
     {
+        #region Properties
+
         private static readonly string dataPath = $@"{Directory.GetCurrentDirectory()}\Data\";
         private static readonly string currentFolder = $@"{dataPath}{DateTime.Now.ToString("dd-MM-yyyy")}\";
+
+        // when we can use a gym
+        private static readonly Dictionary<DayOfWeek, int> PossibleWorkShifts =
+            new Dictionary<DayOfWeek, int>
+            {
+                { DayOfWeek.Sunday, 23 },
+                { DayOfWeek.Monday, 23 },
+                { DayOfWeek.Tuesday, 23 },
+                { DayOfWeek.Wednesday, 23 },
+                { DayOfWeek.Thursday, 23 },
+                { DayOfWeek.Friday, 15 },
+                { DayOfWeek.Saturday, 7 }
+            }; 
+
+        #endregion Properties
 
         public static void Main(string[] args)
         {
@@ -60,11 +77,13 @@ namespace AutomaticSchedule
         }
 
         // return all pair of trainigs
-        private static List<Tuple<Reminder, Reminder>> GetTraningsPairs(WorkSchedule data)
+        private static List<Tuple<Reminder, Reminder>> GetTraningsPairs(WorkSchedule workSchedule)
         {
-            if (data != null && data.Reminders.IsAny())
+            if (workSchedule != null && workSchedule.Reminders.IsAny())
             {
-                var relevantTranings = data.Reminders.FindAll(r => r.Start.Hour == 23);
+                // get all days, that we can use a gym
+                var relevantTranings = workSchedule.Reminders.FindAll(r => PossibleWorkShifts.Any(ws => ws.Key.Equals(r.Start.DayOfWeek) && ws.Value <= r.Start.Hour));
+
                 if (relevantTranings.IsAny())
                 {
                     var actualTranings = new List<Tuple<Reminder, Reminder>>();
@@ -123,7 +142,7 @@ namespace AutomaticSchedule
                 if (AppSettings.SuggestTrainigs)
                 {
                     var traningsPairs = GetTraningsPairs(workSchedule);
-                    
+
                     if (traningsPairs.IsAny())
                     {
                         mailMessage += "Suggested Trainings:\n";
@@ -152,7 +171,7 @@ namespace AutomaticSchedule
 
             if (jsonFiles.IsAny())
             {
-                var file = jsonFiles.OrderBy(f => f.LastWriteTime).First();
+                var file = jsonFiles.OrderByDescending(f => f.LastWriteTime).First();
                 var jsonData = File.ReadAllText(file.FullName);
                 if (jsonData.IsNotNullOrEmpty())
                 {
@@ -199,7 +218,7 @@ namespace AutomaticSchedule
                             //oMail.SaveAs(fileName, true);
                             findAttachment = true;
                             break;
-                        } 
+                        }
                     }
                 }
 
