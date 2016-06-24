@@ -13,6 +13,8 @@ namespace AutomaticSchedule
 
             public static string CalendarIdentifyer => ConfigHelper.GetConfigurationFromAppSettings("Google.CalendarIdentifyer");
             public static string DefaultCalendar => ConfigHelper.GetConfigurationFromAppSettings("Google.DefaultCalendar");
+            public static string DefaultLocation => ConfigHelper.GetConfigurationFromAppSettings("Google.DefaultLocation");
+            public static string DefaultEventTitle => ConfigHelper.GetConfigurationFromAppSettings("Google.DefaultEventTitle");
         }
 
         public static string WantedExtention => ConfigHelper.GetConfigurationFromAppSettings("WantedExtention");

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Calendar.v3;
@@ -74,8 +75,8 @@ namespace AutomaticSchedule
             {
                 var calEvent = new Event
                 {
-                    Summary = "Работа",
-                    Location = "Check Point Software Technologies, הסוללים 5, Tel Aviv-Yafo, 67897, Israel",
+                    Summary = AppSettings.Google.DefaultEventTitle,
+                    Location = AppSettings.Google.DefaultLocation,
                     Start = new EventDateTime
                     {
                         DateTime = reminder.Start
@@ -174,6 +175,36 @@ namespace AutomaticSchedule
         }
 
         #endregion Direction Services
+
+        #region Calendar Link Generator
+        /// <summary>
+        /// Generate link for google calendar
+        /// </summary>
+        /// <param name="title"></param>
+        /// <param name="startDate"></param>
+        /// <param name="endDate"></param>
+        /// <param name="details"></param>
+        /// <returns>link</returns>
+        public static string GetGoogleCalendarEvent(string title, DateTime startDate, DateTime? endDate = null, string details = "")
+        {
+            const string url = "http://www.google.com/calendar/event?action=TEMPLATE";
+            const string src = "developer.newconcept@gmail.com";
+
+            if (endDate == null)
+            {
+                endDate = startDate.AddHours(1);
+            }
+
+            var link = $"{url}&" +
+                       $"text={title}&" +
+                       $"location={AppSettings.Google.DefaultLocation}&" +
+                       $"dates={startDate.ToString("yyyyMMddTHHmmss")}/{endDate.Value.ToString("yyyyMMddTHHmmss")}&" +
+                       $"details={WebUtility.UrlEncode(AppSettings.Google.CalendarIdentifyer)}%0A{WebUtility.UrlEncode(details)}&" +
+                       $"trp=true&sprop=name:Misha Kav&" +
+                       $"src={src}";
+            return link;
+        }
+        #endregion
     }
 
 
