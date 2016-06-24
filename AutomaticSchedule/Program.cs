@@ -36,7 +36,9 @@ namespace AutomaticSchedule
 
             if (AppSettings.IsLocalWork)
             {
+                //Utils.SendMailNotification($"<a href='{GoogleApi.GetGoogleCalendarEvent("Gym", DateTime.Now, null, "Gym")}' target='_blank'>Test Link</a><br/> some html");
                 //var workSchedule = LoadLastResult();
+                //SendEmailNotification(workSchedule);
                 //AddWorkScheduleToCalendar(workSchedule);
             }
             else
@@ -137,7 +139,7 @@ namespace AutomaticSchedule
             if (workSchedule.IsNotEmptyObject() && workSchedule.Reminders.IsAny())
             {
                 var list = workSchedule.Reminders.Select(r => r.ToDisplayFormat());
-                var mailMessage = string.Join("\n", list) + "\n\n";
+                var mailMessage = string.Join("<br/>", list) + "<br/><br/>";
 
                 if (AppSettings.SuggestTrainigs)
                 {
@@ -145,15 +147,15 @@ namespace AutomaticSchedule
 
                     if (traningsPairs.IsAny())
                     {
-                        mailMessage += "Suggested Trainings:\n";
-                        var listPairs = traningsPairs.Select(t => $"#{traningsPairs.IndexOf(t) + 1} {t.Item1.Start.ToString("dddd")} " +
-                                                                  $"({t.Item1.Start.ToDefaultDateFormat()})\n" +
-                                                                  $"     {t.Item2.Start.ToString("dddd")} " +
-                                                                  $"({t.Item2.Start.ToDefaultDateFormat()})\n").ToList();
-                        mailMessage += string.Join("\n", listPairs) + "\n\n";
+                        mailMessage += "<u>Suggested Trainings:</u><br/>";
+                        var listPairs = traningsPairs.Select(t => $"#{traningsPairs.IndexOf(t) + 1} <a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Item1.Start.AddMinutes(30), t.Item1.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Item1.Start.ToString("dddd")}</a> " +
+                                                                  $"({t.Item1.Start.ToDefaultDateFormat()})<br/>" +
+                                                                  $"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Item2.Start.AddMinutes(30), t.Item2.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Item2.Start.ToString("dddd")}</a> " +
+                                                                  $"({t.Item2.Start.ToDefaultDateFormat()})<br/>").ToList();
+                        mailMessage += string.Join("<br/>", listPairs) + "<br/><br/>";
                     }
                 }
-
+                
                 mailMessage += "Automatic Schedule by Misha Kav :)";
                 Utils.WriteStatus(mailMessage);
 
