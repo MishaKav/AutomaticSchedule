@@ -143,15 +143,31 @@ namespace AutomaticSchedule
 
                 if (AppSettings.SuggestTrainigs)
                 {
+                    mailMessage += "<u>Suggested Trainings:</u><br/>";
                     var traningsPairs = GetTraningsPairs(workSchedule);
 
+                    // only traning pairs
                     if (traningsPairs.IsAny())
                     {
-                        mailMessage += "<u>Suggested Trainings:</u><br/>";
-                        var listPairs = traningsPairs.Select(t => $"#{traningsPairs.IndexOf(t) + 1} <a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Item1.Start.AddMinutes(30), t.Item1.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Item1.Start.ToString("dddd")}</a> " +
-                                                                  $"({t.Item1.Start.ToDefaultDateFormat()})<br/>" +
-                                                                  $"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Item2.Start.AddMinutes(30), t.Item2.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Item2.Start.ToString("dddd")}</a> " +
-                                                                  $"({t.Item2.Start.ToDefaultDateFormat()})<br/>").ToList();
+                        var listPairs =
+                            traningsPairs.Select(
+                                t =>
+                                    $"#{traningsPairs.IndexOf(t) + 1} <a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Item1.Start.AddMinutes(30), t.Item1.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Item1.Start.ToString("dddd")}</a> " +
+                                    $"({t.Item1.Start.ToDefaultDateFormat()})<br/>" +
+                                    $"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Item2.Start.AddMinutes(30), t.Item2.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Item2.Start.ToString("dddd")}</a> " +
+                                    $"({t.Item2.Start.ToDefaultDateFormat()})<br/>").ToList();
+                        mailMessage += string.Join("<br/>", listPairs) + "<br/><br/>";
+                    }
+                    else
+                    {
+                        // get all days, that we can use a gym
+                        var relevantTranings = workSchedule.Reminders.FindAll(r => PossibleWorkShifts.Any(ws => ws.Key.Equals(r.Start.DayOfWeek) && ws.Value <= r.Start.Hour));
+
+                        var listPairs =
+                            relevantTranings.Select(
+                                t =>
+                                    $"#{relevantTranings.IndexOf(t) + 1} <a href='{GoogleApi.GetGoogleCalendarEvent("Gym", t.Start.AddMinutes(30), t.Start.AddMinutes(180), "#Gym#")}' target='_blank'>{t.Start.ToString("dddd")}</a> " +
+                                    $"({t.Start.ToDefaultDateFormat()})<br/>").ToList();
                         mailMessage += string.Join("<br/>", listPairs) + "<br/><br/>";
                     }
                 }
