@@ -16,7 +16,8 @@ namespace AutomaticSchedule
             ErrorLog = 0,       // defaulft logger - see NGLOG.config
             MyCustomLog,
             StatusLog,
-            Gmail
+            Gmail,
+            GmailLocal
         }
 
         public static Logger GetLogger(LoggerList logName = LoggerList.ErrorLog)
@@ -90,7 +91,12 @@ namespace AutomaticSchedule
             WriteStatus(fullMsg);
 
             // send email by Gmail
-            LogManager.GetLogger(LoggerList.Gmail.ToString()).Info(msg);
+            var logger = LoggerList.Gmail.ToString();
+            if (AppSettings.IsLocalWork)
+            {
+                logger = LoggerList.GmailLocal.ToString();
+            }
+            LogManager.GetLogger(logger).Info(msg);
         }
         #endregion NLOG
 
