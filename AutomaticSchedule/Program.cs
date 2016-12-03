@@ -26,7 +26,7 @@ namespace AutomaticSchedule
                 { DayOfWeek.Thursday, 23 },
                 { DayOfWeek.Friday, 15 },
                 { DayOfWeek.Saturday, 7 }
-            }; 
+            };
 
         #endregion Properties
 
