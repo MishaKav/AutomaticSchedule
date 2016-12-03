@@ -36,6 +36,7 @@ namespace AutomaticSchedule
 
             if (AppSettings.IsLocalWork)
             {
+                //SaveScheduleFromGmail();
                 //Utils.SendMailNotification($"<a href='{GoogleApi.GetGoogleCalendarEvent("Gym", DateTime.Now, null, "Gym")}' target='_blank'>Test Link</a><br/> some html");
                 //var workSchedule = LoadLastResult();
                 //SendEmailNotification(workSchedule);
@@ -43,7 +44,7 @@ namespace AutomaticSchedule
             }
             else
             {
-                if (SaveExcelFromGmail())
+                if (SaveScheduleFromGmail())
                 {
                     var scheduleFiles = Directory.GetFiles(currentFolder, $"*.{AppSettings.WantedExtention}").Select(s => new FileInfo(s)).ToList();
                     if (scheduleFiles.IsAny())
@@ -242,6 +243,34 @@ namespace AutomaticSchedule
 
                 oClient.Quit();
                 return findAttachment;
+            }
+            catch (Exception ex)
+            {
+                Utils.WriteErrorLog(ex, "Scan Gmail");
+            }
+
+            return false;
+        }
+
+        // scan and save Gmail from attachment with wanted format
+        private static bool SaveScheduleFromGmail()
+        {
+            try
+            {
+                // if dir exist, so we already scan schedule
+                if (Directory.Exists(currentFolder))
+                {
+                    return false;
+                }
+
+                GoogleApi.CreateCredentinals();
+                var wantedEmails = GoogleApi.ListMessages("kostya.shiyan@gmail.com has:attachment (xls OR xlsx)");
+                if (wantedEmails.IsAny())
+                {
+                    var list = GoogleApi.GetAttachments(wantedEmails[0].Id, currentFolder);
+
+                    return list.IsAny();
+                }
             }
             catch (Exception ex)
             {

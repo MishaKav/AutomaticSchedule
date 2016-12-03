@@ -28,8 +28,8 @@ namespace AutomaticSchedule
                 Name = name,
                 //StartDateTime = Convert.ToDateTime(GetCellValue(4, 2)),
                 //EndDateTime = Convert.ToDateTime(GetCellValue(4, 14))
-                StartDateTime = DateTime.ParseExact(GetCellValue(4, 3), "d.M.yyyy", CultureInfo.InvariantCulture),
-                EndDateTime = DateTime.ParseExact(GetCellValue(22, 3), "d.M.yyyy", CultureInfo.InvariantCulture)
+                StartDateTime = DateTime.ParseExact(GetCellValue(4, 2), "d.M.yyyy", CultureInfo.InvariantCulture),
+                EndDateTime = DateTime.ParseExact(GetCellValue(22, 2), "d.M.yyyy", CultureInfo.InvariantCulture)
             };
 
             for (var i = 1; i <= _range.Rows.Count; i++)
@@ -82,7 +82,7 @@ namespace AutomaticSchedule
                     {
                         counter++;
                         int[] start = null, end = null;
-                        var cellTimes = GetCellValue(i, 4);
+                        var cellTimes = GetCellValue(i, 3);
                         if (!string.IsNullOrEmpty(cellTimes))
                         {
                             cellTimes = cellTimes.Trim();
@@ -105,7 +105,7 @@ namespace AutomaticSchedule
                                 end = new[] { 07, 00 };
                             }
                         }
-                        var date = TryGetDate(i, 3);
+                        var date = TryGetDate(i, 2);
                         if (start.IsAny() && end.IsAny())
                         {
                             var reminder = new Reminder
@@ -133,7 +133,7 @@ namespace AutomaticSchedule
 
             //MessageBox.Show(text);
 
-            xlWorkBook.Close(true, null, null);
+            xlWorkBook.Close(true);
             xlApp.Quit();
 
             ReleaseObject(xlWorkSheet);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -8,6 +9,10 @@ using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Services;
 using Newtonsoft.Json;
+using System.IO;
+using Google.Apis.Gmail.v1;
+using Google.Apis.Gmail.v1.Data;
+using Google.Apis.Util.Store;
 
 namespace AutomaticSchedule
 {
@@ -16,6 +21,7 @@ namespace AutomaticSchedule
         public static List<CalendarListEntry> CalendarsList;
         public static CalendarListEntry SelectedCalendar;
         public static CalendarService CalendarConnection;
+        public static GmailService GmailService;
 
         //http://codekicker.de/news/Retrieving-calendar-events-using-Google-Calendar-API
         public static bool ConnectCalendar()
@@ -205,7 +211,130 @@ namespace AutomaticSchedule
             return link;
         }
         #endregion
-    }
+
+        #region Google API for Gmail
+        //https://developers.google.com/gmail/api/v1/reference/users/messages/attachments/get
+
+        public static void CreateCredentinals()
+        {
+            using (var stream = new FileStream("client_secret.json", FileMode.Open, FileAccess.Read))
+            {
+                var credPath = Path.Combine(Environment.CurrentDirectory, ".credentials/gmail-dotnet-quickstart.json");
+
+                var credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
+                    GoogleClientSecrets.Load(stream).Secrets,
+                    new[] { GmailService.Scope.GmailReadonly },
+                    "user",
+                    CancellationToken.None,
+                    new FileDataStore(credPath, true)).Result;
+
+                Debug.WriteLine("Credential file saved to: " + credPath);
+                
+                // Create Gmail API service.
+                GmailService = new GmailService(new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = "Gmail API .NET Automatic Schedule"
+                });
+            }
+        }
+
+        public static void PrintAllLabels()
+        {
+            // Define parameters of request.
+            var request = GmailService.Users.Labels.List("me");
+
+            // List labels.
+            var labels = request.Execute().Labels;
+            Console.WriteLine("Labels:");
+            if (labels != null && labels.Count > 0)
+            {
+                foreach (var labelItem in labels)
+                {
+                    Console.WriteLine($"{labelItem.Name}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No labels found.");
+            }
+        }
+
+        /// <summary>
+        /// List all Messages of the user's mailbox matching the query.
+        /// </summary>
+        /// <param name="query">String used to filter Messages returned.</param>
+        public static List<Message> ListMessages(string query)
+        {
+            const string userId = "me";
+            var result = new List<Message>();
+            var request = GmailService.Users.Messages.List(userId);
+            request.Q = query;
+
+            do
+            {
+                try
+                {
+                    var response = request.Execute();
+                    result.AddRange(response.Messages);
+                    request.PageToken = response.NextPageToken;
+                }
+                catch (Exception e)
+                {
+                    Utils.WriteErrorLog(e);
+                }
+            } while (request.PageToken.IsNotNullOrEmpty());
+
+            return result;
+        }
+
+        /// <summary>
+        /// Get and store attachment from Message with given ID.
+        /// </summary>
+        /// <param name="messageId">ID of Message containing attachment.</param>
+        /// <param name="outputDir">Directory used to store attachments.</param>
+        public static List<string> GetAttachments(string messageId, string outputDir)
+        {
+            const string userId = "me";
+            var list = new List<string>();
+
+            try
+            {
+                var message = GmailService.Users.Messages.Get(userId, messageId).Execute();
+                var parts = message.Payload.Parts;
+                foreach (var part in parts)
+                {
+                    if (part.Filename.IsNotNullOrEmpty())
+                    {
+                        var attId = part.Body.AttachmentId;
+                        var attachPart = GmailService.Users.Messages.Attachments.Get(userId, messageId, attId).Execute();
+
+                        // Converting from RFC 4648 base64 to base64url encoding
+                        // see http://en.wikipedia.org/wiki/Base64#Implementations_and_history
+                        var attachData = attachPart.Data.Replace('-', '+');
+                        attachData = attachData.Replace('_', '/');
+
+                        var data = Convert.FromBase64String(attachData);
+                        var pathToFile = Path.Combine(outputDir, part.Filename);
+                        if (!Directory.Exists(outputDir))
+                        {
+                            Directory.CreateDirectory(outputDir);
+                        }
+                        File.WriteAllBytes(pathToFile, data);
+                        list.Add(pathToFile);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Utils.WriteErrorLog(e);
+            }
+
+            return list;
+        }
+
+        #endregion Google API for Gmail
+}
 
 
     #region Google autocomplete places class
