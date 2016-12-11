@@ -78,7 +78,7 @@ namespace AutomaticSchedule
                     #endregion
 
                     #region CheckPoint
-                    if (cell == name)
+                    if (cell.ContainsIgnoreCase(name))
                     {
                         counter++;
                         int[] start = null, end = null;
@@ -113,7 +113,7 @@ namespace AutomaticSchedule
                                 DayDesc = TryGetDayDesc(i, 2),
                                 Start = date.AddHours(start[0]).AddMinutes(start[1]),
                                 End = date.AddHours(end[0]).AddMinutes(end[1]),
-                                JobName = GetCellValue(2, j)
+                                JobName = $"{GetCellValue(2, j)}   {cell}"
                             };
 
                             // check if end time in next day
