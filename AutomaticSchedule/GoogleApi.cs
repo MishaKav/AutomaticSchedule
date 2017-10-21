@@ -22,6 +22,7 @@ namespace AutomaticSchedule
         public static CalendarListEntry SelectedCalendar;
         public static CalendarService CalendarConnection;
         public static GmailService GmailService;
+        private const string GooleDateFormat = "yyyy-MM-dd";
 
         //http://codekicker.de/news/Retrieving-calendar-events-using-Google-Calendar-API
         public static bool ConnectCalendar()
@@ -75,6 +76,43 @@ namespace AutomaticSchedule
             }
         }
 
+        public static bool AddEvent(string summary, DateTime start, DateTime? end = null, string location = null, string description = null, bool? allDay = null)
+        {
+            if (SelectedCalendar != null)
+            {
+                var allDayEvent = allDay.HasValue && allDay.Value;
+
+                var calEvent = new Event
+                {
+                    Summary = summary,
+                    Location = location,
+                    Start = new EventDateTime { DateTime = start },
+                    End = new EventDateTime { DateTime = end },
+                    Description = $"{AppSettings.Google.CalendarIdentifyer}\n\n{description}",
+                    Reminders = new Event.RemindersData { UseDefault = false }
+                };
+
+                // allDay event or not
+                calEvent.Start = allDayEvent ? new EventDateTime { Date = start.ToString(GooleDateFormat) } : new EventDateTime { DateTime = start };
+
+                if (end.HasValue && allDayEvent)
+                {
+                    calEvent.End = new EventDateTime { Date = end.Value.ToString(GooleDateFormat) };
+                }
+
+                //Set Remainder
+                if (IsEventExist(calEvent.Summary, calEvent.Start))
+                {
+                    var prevEvents = GetEvents(calEvent.Summary, calEvent.Start);
+                    prevEvents.ForEach(e => DeleteEvent(e.Id));
+                }
+
+                CalendarConnection.Events.Insert(calEvent, SelectedCalendar.Id).Execute();
+                return IsEventExist(calEvent.Summary, calEvent.Start);
+            }
+            return false;
+        }
+
         public static bool AddEvent(Reminder reminder)
         {
             if (SelectedCalendar != null)
@@ -83,42 +121,33 @@ namespace AutomaticSchedule
                 {
                     Summary = AppSettings.Google.DefaultEventTitle,
                     Location = AppSettings.Google.DefaultLocation,
-                    Start = new EventDateTime
-                    {
-                        DateTime = reminder.Start
-                    },
-                    End = new EventDateTime
-                    {
-                        DateTime = reminder.End
-                    },
+                    Start = new EventDateTime { DateTime = reminder.Start },
+                    End = new EventDateTime { DateTime = reminder.End },
                     Description = $"{AppSettings.Google.CalendarIdentifyer}\nJob: {reminder.JobName}\nHours: {(reminder.End - reminder.Start).TotalHours} h",
                     Reminders = new Event.RemindersData { UseDefault = false }
                 };
 
                 //Set Remainder
-                if (IsEventExist(calEvent.Summary, calEvent.Start.DateTime))
+                if (IsEventExist(calEvent.Summary, calEvent.Start))
                 {
-                    var prevEvents = GetEvents(calEvent.Summary, calEvent.Start.DateTime);
+                    var prevEvents = GetEvents(calEvent.Summary, calEvent.Start);
                     prevEvents.ForEach(e => DeleteEvent(e.Id));
                 }
 
                 CalendarConnection.Events.Insert(calEvent, SelectedCalendar.Id).Execute();
-                return IsEventExist(calEvent.Summary, calEvent.Start.DateTime);
+                return IsEventExist(calEvent.Summary, calEvent.Start);
             }
             return false;
         }
 
-        private static List<Event> GetEvents(string eventName, DateTime? datetime)
+        private static List<Event> GetEvents(string eventName, EventDateTime eventDateTime)
         {
             if (SelectedCalendar != null)
             {
                 var lr = CalendarConnection.Events.List(SelectedCalendar.Id);
 
-                lr.TimeMin = datetime;
-                if (datetime != null)
-                {
-                    lr.TimeMax = datetime.Value.AddDays(1);
-                }
+                lr.TimeMin = eventDateTime.DateTime ?? DateTime.ParseExact(eventDateTime.Date, GooleDateFormat, null);
+                lr.TimeMax = lr.TimeMin.Value.AddDays(1);
 
                 var request = lr.Execute();
 
@@ -132,24 +161,23 @@ namespace AutomaticSchedule
             return null;
         }
 
-        private static bool IsEventExist(string eventName, DateTime? datetime)
+        private static bool IsEventExist(string eventName, EventDateTime eventDateTime)
         {
             if (SelectedCalendar != null)
             {
                 var lr = CalendarConnection.Events.List(SelectedCalendar.Id);
 
-                lr.TimeMin = datetime;
-                if (datetime != null)
-                {
-                    lr.TimeMax = datetime.Value.AddDays(1);
-                }
+                lr.TimeMin = eventDateTime.DateTime ?? DateTime.ParseExact(eventDateTime.Date, GooleDateFormat, null);
+                lr.TimeMax = lr.TimeMin.Value.AddDays(1);
 
                 var request = lr.Execute();
 
                 if (request.IsNotEmptyObject() && request.Items.IsAny())
                 {
                     var events = request.Items.ToList();
-                    return events.Any(e => e.Summary.ContainsIgnoreCase(eventName) && e.Description.ContainsIgnoreCase(AppSettings.Google.CalendarIdentifyer));
+                    events.RemoveAll(e => !e.Description.ContainsIgnoreCase(AppSettings.Google.CalendarIdentifyer));
+                    var isEventExist = events.Any(e => e.Summary.ContainsIgnoreCase(eventName));
+                    return isEventExist;
                 }
             }
 
@@ -229,7 +257,7 @@ namespace AutomaticSchedule
                     new FileDataStore(credPath, true)).Result;
 
                 Debug.WriteLine("Credential file saved to: " + credPath);
-                
+
                 // Create Gmail API service.
                 GmailService = new GmailService(new BaseClientService.Initializer()
                 {
@@ -334,7 +362,7 @@ namespace AutomaticSchedule
         }
 
         #endregion Google API for Gmail
-}
+    }
 
 
     #region Google autocomplete places class

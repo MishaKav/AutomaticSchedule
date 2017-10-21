@@ -25,7 +25,7 @@ namespace AutomaticSchedule
 
         public override string ToString()
         {
-            return $"{Start.ToString("ddd")} {JobName}: {Start.ToString("dd/MM/yy HH:mm")} - {End.ToString("HH:mm")}";
+            return $"{Start:ddd} {JobName}: {Start:dd/MM/yy HH:mm} - {End:HH:mm}";
         }
     }
 
@@ -35,7 +35,7 @@ namespace AutomaticSchedule
         {
             if (source == null) return string.Empty;
 
-            var text = $"{source.Start.ToDefaultDateFormat()}  {source.Start.ToString("ddd"),-8}: {source.Start.ToDefaultTimeFormat()} - {source.End.ToDefaultTimeFormat()}    [{(source.End - source.Start).TotalHours,-2} h]";
+            var text = $"{source.Start.ToDefaultDateFormat()}  {source.Start,-8:ddd}: {source.Start.ToDefaultTimeFormat()} - {source.End.ToDefaultTimeFormat()}    [{(source.End - source.Start).TotalHours,-2} h]";
             return text;
         }
     }

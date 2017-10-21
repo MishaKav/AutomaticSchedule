@@ -12,8 +12,8 @@ namespace AutomaticSchedule
     {
         #region Properties
 
-        private static readonly string dataPath = $@"{Directory.GetCurrentDirectory()}\Data\";
-        private static readonly string currentFolder = $@"{dataPath}{DateTime.Now.ToString("dd-MM-yyyy")}\";
+        private static readonly string DataPath = $@"{Directory.GetCurrentDirectory()}\Data\";
+        private static readonly string CurrentFolder = $@"{DataPath}{DateTime.Now:dd-MM-yyyy}\";
 
         // when we can use a gym
         private static readonly Dictionary<DayOfWeek, int> PossibleWorkShifts =
@@ -36,6 +36,7 @@ namespace AutomaticSchedule
 
             if (AppSettings.IsLocalWork)
             {
+                //TestTaglit();
                 //SaveScheduleFromGmail();
                 //Utils.SendMailNotification($"<a href='{GoogleApi.GetGoogleCalendarEvent("Gym", DateTime.Now, null, "Gym")}' target='_blank'>Test Link</a><br/> some html");
                 //var workSchedule = LoadLastResult();
@@ -46,7 +47,7 @@ namespace AutomaticSchedule
             {
                 if (SaveScheduleFromGmail())
                 {
-                    var scheduleFiles = Directory.GetFiles(currentFolder, $"*.{AppSettings.WantedExtention}").Select(s => new FileInfo(s)).ToList();
+                    var scheduleFiles = Directory.GetFiles(CurrentFolder, $"*.{AppSettings.WantedExtention}").Select(s => new FileInfo(s)).ToList();
                     if (scheduleFiles.IsAny())
                     {
                         var file = scheduleFiles.OrderBy(f => f.LastWriteTime).First();
@@ -77,6 +78,43 @@ namespace AutomaticSchedule
 
             globalWatch.Stop();
             Utils.WriteStatus("Work Done | " + globalWatch.ToDefaultFormat());
+        }
+
+        // read json with all taglit groups, and add to calendar all groups with russian language
+        private static void TestTaglit()
+        {
+            var jsonFilePath = $@"{Directory.GetCurrentDirectory()}\Taglit.json";
+            if (File.Exists(jsonFilePath))
+            {
+                var jsonFile = File.ReadAllText(jsonFilePath);
+                var jsonArr = JsonConvert.DeserializeObject<List<TaglitMeeting>>(jsonFile);
+                var allRussianGroups = jsonArr.FindAll(t => t.Languages.ContainsIgnoreCase("Russian"));
+                AddTaglitMeetingsToCalendar(allRussianGroups);
+            }
+        }
+
+        private static void AddTaglitMeetingsToCalendar(List<TaglitMeeting> meetingArr)
+        {
+            Utils.RunProgressBar("Connect to Google Calendar", 7);
+            var coonected = GoogleApi.ConnectCalendar();
+            Utils.ProgressBar.Finish();
+
+            if (coonected)
+            {
+                Utils.RunProgressBar($"Start adding {meetingArr.Count} event to Google Calendar", 10);
+                var watch = Stopwatch.StartNew();
+                foreach (var meeting in meetingArr)
+                {
+                    var summary = $"Taglit {meeting.GroupCode}";
+                    var description = $"{JsonConvert.SerializeObject(meeting, Formatting.Indented)}";
+                    var eventAdded = GoogleApi.AddEvent(summary, meeting.MifgashimStart, meeting.MifgashimEnd, null, description, true);
+                    Utils.WriteStatus($"{meeting} is {(eventAdded ? "added" : "NOT ADDED")}");
+                }
+                watch.Stop();
+                Utils.ProgressBar.Finish();
+
+                Utils.WriteStatus($"Success add {meetingArr.Count} events | {watch.ToDefaultFormat()}");
+            }
         }
 
         // return all pair of trainigs
@@ -130,7 +168,7 @@ namespace AutomaticSchedule
                 Utils.WriteStatus($"Success add {workSchedule.Reminders.Count} events | {watch.ToDefaultFormat()}");
 
                 var jsonSchedule = JsonConvert.SerializeObject(workSchedule, Formatting.Indented);
-                File.WriteAllText($"{currentFolder}data.json", jsonSchedule);
+                File.WriteAllText($"{CurrentFolder}data.json", jsonSchedule);
             }
         }
 
@@ -172,7 +210,7 @@ namespace AutomaticSchedule
                         mailMessage += string.Join("<br/>", listPairs) + "<br/><br/>";
                     }
                 }
-                
+
                 mailMessage += "Automatic Schedule by Misha Kav :)";
                 Utils.WriteStatus(mailMessage);
 
@@ -186,7 +224,7 @@ namespace AutomaticSchedule
         // need to work from local. Just load the last result from local json file
         private static WorkSchedule LoadLastResult()
         {
-            var jsonFiles = Directory.GetFiles(dataPath, "*.json", SearchOption.AllDirectories).Select(s => new FileInfo(s)).ToList();
+            var jsonFiles = Directory.GetFiles(DataPath, "*.json", SearchOption.AllDirectories).Select(s => new FileInfo(s)).ToList();
 
             if (jsonFiles.IsAny())
             {
@@ -227,13 +265,13 @@ namespace AutomaticSchedule
 
                         if (oMail.Attachments.IsAny() && oMail.Attachments.Any(a => a.Name.ContainsIgnoreCase(AppSettings.WantedExtention)))
                         {
-                            if (!Directory.Exists(currentFolder))
+                            if (!Directory.Exists(CurrentFolder))
                             {
-                                Directory.CreateDirectory(currentFolder);
+                                Directory.CreateDirectory(CurrentFolder);
                             }
 
                             //var fileName = $@"{currentFolder}/{oMail.From.Address}_{oMail.Subject.Replace(":", string.Empty).Replace("(Trial Version)", string.Empty)}.eml";
-                            oMail.Attachments[0].SaveAs($@"{currentFolder}\{oMail.Attachments[0].Name}", true);
+                            oMail.Attachments[0].SaveAs($@"{CurrentFolder}\{oMail.Attachments[0].Name}", true);
                             //oMail.SaveAs(fileName, true);
                             findAttachment = true;
                             break;
@@ -258,7 +296,7 @@ namespace AutomaticSchedule
             try
             {
                 // if dir exist, so we already scan schedule
-                if (Directory.Exists(currentFolder))
+                if (Directory.Exists(CurrentFolder))
                 {
                     return false;
                 }
@@ -267,7 +305,7 @@ namespace AutomaticSchedule
                 var wantedEmails = GoogleApi.ListMessages("kostya.shiyan@gmail.com has:attachment (xls OR xlsx)");
                 if (wantedEmails.IsAny())
                 {
-                    var list = GoogleApi.GetAttachments(wantedEmails[0].Id, currentFolder);
+                    var list = GoogleApi.GetAttachments(wantedEmails[0].Id, CurrentFolder);
 
                     return list.IsAny();
                 }
